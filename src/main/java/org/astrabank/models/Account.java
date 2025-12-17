@@ -17,4 +17,5 @@ public class Account {
     private long balance;            // Số dư
     private AccountType accountType;        // Loại tài khoản (saving, checking,...)
     private Date createdAt;
+    private Double interestRate;
 }

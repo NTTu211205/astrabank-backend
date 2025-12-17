@@ -45,6 +45,10 @@ public class AccountService {
         account.setCreatedAt(new Date());
         account.setUserId(accountRequest.getUserId());
 
+        if (accountRequest.getAccountType().toString().equals("SAVING")) {
+            account.setInterestRate(0.045);
+        }
+
         ApiFuture<WriteResult> future = dbFirestore.collection("accounts").document(accountNumber).set(account);
 
         return account;

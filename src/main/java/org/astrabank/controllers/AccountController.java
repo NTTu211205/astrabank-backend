@@ -116,4 +116,36 @@ public class AccountController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
         }
     }
+
+    @GetMapping("findAll/{userId}")
+    public ResponseEntity<ApiResponse<List<Account>>> getAllAccounts(@PathVariable String userId) {
+        try {
+            List<Account> accounts = accountService.findAllAccounts(userId);
+            if (accounts == null) {
+                ApiResponse<List<Account>> response = ApiResponse.<List<Account>>builder()
+                        .code(STATUS_CODE_OK)
+                        .result(null)
+                        .message("Account not found")
+                        .build();
+
+                return ResponseEntity.status(HttpStatus.OK).body(response);
+            }
+            else {
+                ApiResponse<List<Account>> response = ApiResponse.<List<Account>>builder()
+                        .code(STATUS_CODE_OK)
+                        .result(accounts)
+                        .message("Account found")
+                        .build();
+
+                return ResponseEntity.status(HttpStatus.OK).body(response);
+            }
+        } catch (Exception e) {
+            ApiResponse<List<Account>> error = ApiResponse.<List<Account>>builder()
+                    .code(STATUS_CODE_FAILED)
+                    .message(e.getMessage())
+                    .result(null)
+                    .build();
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        }
+    }
 }

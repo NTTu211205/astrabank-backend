@@ -11,7 +11,9 @@ import org.astrabank.utils.AccountNumberGenerator;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.Collections;
 import java.util.Date;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 @Service
@@ -120,6 +122,25 @@ public class AccountService {
         else {
             return false;
         }
+    }
+
+    public List<Account> findAllAccounts(String userId) throws ExecutionException, InterruptedException, NullPointerException {
+        Firestore dbFirestore = FirestoreClient.getFirestore();
+
+        QuerySnapshot querySnapshot = dbFirestore.collection("accounts")
+                .whereEqualTo("userId", userId)
+                .get().get();
+
+        if (!querySnapshot.isEmpty()) {
+            for (QueryDocumentSnapshot document : querySnapshot) {
+                Account account = document.toObject(Account.class);
+                return Collections.singletonList(account);
+            }
+        }
+        else {
+            throw new IllegalArgumentException("User not found");
+        }
+        return null;
     }
 
     public ApiFuture<WriteResult> subtractBalance(String accountNumber, double amount) {

@@ -149,7 +149,36 @@ public class AccountController {
         }
     }
 
-
     // check stk different bank
+    @GetMapping("/{accountNumber}/{bankSymbol}")
+    public ResponseEntity<ApiResponse<AccountResponse>> findAccount(@PathVariable String accountNumber, @PathVariable String bankSymbol) {
+        try {
+            AccountResponse account = accountService.findAccount(accountNumber, bankSymbol);
 
+            ApiResponse<AccountResponse> response;
+            if (account == null) {
+                response = ApiResponse.<AccountResponse>builder()
+                        .code(STATUS_CODE_OK)
+                        .message("Account not found")
+                        .result(null)
+                        .build();
+            } else {
+                response = ApiResponse.<AccountResponse>builder()
+                        .code(STATUS_CODE_OK)
+                        .message("Account found successfully")
+                        .result(account)
+                        .build();
+            }
+            return ResponseEntity.status(HttpStatus.OK).body(response);
+        }
+        catch (Exception e) {
+            ApiResponse<AccountResponse> error = ApiResponse.<AccountResponse>builder()
+                    .code(STATUS_CODE_FAILED)
+                    .message(e.getMessage())
+                    .result(null)
+                    .build();
+
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        }
+    }
 }

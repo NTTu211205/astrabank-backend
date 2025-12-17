@@ -9,17 +9,24 @@ import org.astrabank.models.Account;
 import org.astrabank.models.Bank;
 import org.astrabank.models.User;
 import org.astrabank.utils.AccountNumberGenerator;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 @Service
 public class AccountService {
     private final PasswordEncoder passwordEncoder;
+    private final RestTemplate restTemplate = new RestTemplate();
 
     public AccountService(PasswordEncoder passwordEncoder) {
         this.passwordEncoder = passwordEncoder;
@@ -91,25 +98,52 @@ public class AccountService {
         return null;
     }
 
-//    public AccountResponse findAccount(String accountNumber, String bankSymbol) throws ExecutionException, InterruptedException {
-//        Firestore dbFirestore = FirestoreClient.getFirestore();
-//
-//        DocumentSnapshot documentSnapshot = dbFirestore.collection("accounts").document(bankSymbol).get().get();
-//
-//        if (documentSnapshot.exists()) {
-//            Bank bank = documentSnapshot.toObject(Bank.class);
-//
-//            if (bank != null) {
-//
-//            }
-//            else {
-//                throw new IllegalArgumentException("Bank not found");
-//            }
-//        }
-//        else {
-//            throw new IllegalArgumentException("Bank not found");
-//        }
-//    }
+    public AccountResponse findAccount(String accountNumber, String bankSymbol) throws Exception {
+        Firestore dbFirestore = FirestoreClient.getFirestore();
+
+        DocumentSnapshot documentSnapshot = dbFirestore.collection("banks").document(bankSymbol).get().get();
+
+        if (documentSnapshot.exists()) {
+            Bank bank = documentSnapshot.toObject(Bank.class);
+
+            if (bank != null) {
+                String link = bank.getLinkApiCheck() + accountNumber;
+                Object result = callUrl(link, null);
+
+                Map<String, Object> resultMap = (Map<String, Object>) result;
+                AccountResponse accountResponse = new AccountResponse();
+                accountResponse.setAccountNumber(accountNumber);
+                accountResponse.setAccountName((String) resultMap.get("fullName"));
+                return accountResponse;
+            }
+            else {
+                throw new IllegalArgumentException("Bank not found");
+            }
+        }
+        else {
+            throw new IllegalArgumentException("Bank not found");
+        }
+    }
+
+    public Object callUrl(String url, Object requestBody) throws Exception {
+        if (url == null || url.isEmpty()) {
+            throw new RuntimeException("URL không hợp lệ");
+        }
+
+        if (requestBody != null) {
+            // Tạo Header (thường là JSON)
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            HttpEntity<Object> entity = new HttpEntity<>(requestBody, headers);
+
+            return restTemplate.postForObject(url, entity, Object.class);
+        }
+
+        else {
+            return restTemplate.getForObject(url, Object.class);
+        }
+    }
 
     public Account getAccountForUSer(String userId, String accountType)
             throws ExecutionException, InterruptedException, IllegalArgumentException {

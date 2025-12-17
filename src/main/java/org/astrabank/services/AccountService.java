@@ -59,8 +59,6 @@ public class AccountService {
         return accountNumber;
     }
 
-    // If account exist -> true
-    // else  -> false
     public AccountResponse findAccount(String accountNumber) throws ExecutionException, InterruptedException {
         Firestore dbFirestore = FirestoreClient.getFirestore();
 

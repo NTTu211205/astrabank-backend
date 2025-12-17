@@ -7,6 +7,7 @@ import com.google.cloud.firestore.Firestore;
 import com.google.cloud.firestore.WriteResult;
 import com.google.firebase.cloud.FirestoreClient;
 import org.astrabank.constant.TransactionStatus;
+import org.astrabank.dto.AccountResponse;
 import org.astrabank.dto.TransactionRequest;
 import org.astrabank.models.Transaction;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -19,7 +20,7 @@ import java.util.concurrent.ExecutionException;
 public class TransactionService {
 
     private final AccountService accountService;
-    private final String BANK_DESTINATION_SYMBOL = "ATB1";
+    private final String BANK_DESTINATION_SYMBOL = "ATB";
     private final BankService bankService;
 
     public TransactionService(AccountService accountService, BankService bankService) {
@@ -30,12 +31,10 @@ public class TransactionService {
     public Transaction progressTransferring(TransactionRequest transactionRequest)
             throws ExecutionException, InterruptedException, NullPointerException, IllegalArgumentException
     {
-        System.out.print(transactionRequest.toString());
-
-        if (!transactionRequest.getDestinationBankSymbol().equals(BANK_DESTINATION_SYMBOL)) {
-            System.out.println("Wrong destination bank symbol");
-            throw new IllegalArgumentException("Wrong destination bank symbol");
-        }
+//        if (!transactionRequest.getDestinationBankSymbol().equals(BANK_DESTINATION_SYMBOL)) {
+//            System.out.println("Wrong destination bank symbol");
+//            throw new IllegalArgumentException("Wrong destination bank symbol");
+//        }
 
         // check balance
         Boolean checkBalance = accountService.checkBalance(
@@ -123,6 +122,82 @@ public class TransactionService {
                     }
 
                     accountService.deductBalanceTx(t, transactionRequest.getSourceAccountNumber(), transactionRequest.getAmount());
+                    accountService.addBalanceTx(t, transactionRequest.getDestinationAccountNumber(), transactionRequest.getAmount());
+
+                    t.update(transRef, "status", "SUCCESS");
+                    t.update(transRef, "updatedAt", new Date());
+
+                    return null;
+                }
+            }).get();
+
+            transaction.setStatus(TransactionStatus.SUCCESS);
+            return transaction;
+
+        } catch (Exception e) {
+            dbFirestore.collection("transactions").document(transaction.getTransactionId()).update("status", "FAILED");
+
+            throw new RuntimeException("Giao dịch thất bại: " + e.getMessage());
+        }
+    }
+
+    public Transaction receiveTransfer(TransactionRequest transactionRequest)
+            throws ExecutionException, InterruptedException, NullPointerException, IllegalArgumentException
+    {
+        // kiem tra source bank
+        boolean isExist = bankService.checkBank(transactionRequest.getSourceBankSymbol());
+        if (!isExist) {
+            throw new IllegalArgumentException("Wrong source bank symbol");
+        }
+
+        // check destination bank
+        if (!transactionRequest.getDestinationBankSymbol().equals(BANK_DESTINATION_SYMBOL)) {
+            System.out.println("Wrong destination bank symbol");
+            throw new IllegalArgumentException("Wrong destination bank symbol");
+        }
+
+        // kiem tra so tai khoan
+        AccountResponse accountResponse = accountService.findAccount(transactionRequest.getDestinationAccountNumber());
+        if (accountResponse == null) {
+            throw new IllegalArgumentException("Account not found");
+        }
+
+        // tao giao dich
+        Firestore dbFirestore = FirestoreClient.getFirestore();
+        Transaction transaction = new Transaction();
+        DocumentReference documentReference =  dbFirestore.collection("transactions").document();
+        transaction.setTransactionId(documentReference.getId());
+        transaction.setSourceAcc(transactionRequest.getSourceAccountNumber());
+        transaction.setBankSourceSymbol(transactionRequest.getSourceBankSymbol());
+        transaction.setDestinationAcc(transactionRequest.getDestinationAccountNumber());
+        transaction.setBankDesSymbol(transactionRequest.getDestinationBankSymbol());
+        transaction.setStatus(TransactionStatus.PENDING);
+        transaction.setAmount(transactionRequest.getAmount());
+        transaction.setType(transactionRequest.getTransactionType());
+        transaction.setDescription(transactionRequest.getDescription());
+        transaction.setCreatedAt(new Date());
+        transaction.setUpdatedAt(new Date());
+        transaction.setSenderName(transactionRequest.getSenderName());
+        transaction.setReceiverName(transactionRequest.getReceiverName());
+
+        ApiFuture<WriteResult> future = dbFirestore
+                .collection("transactions")
+                .document(transaction.getTransactionId())
+                .set(transaction);
+        WriteResult result = future.get();
+
+        // nhan tien
+        // update trang thai
+        try {
+            dbFirestore.runTransaction(new com.google.cloud.firestore.Transaction.Function<Object>() {
+                @Override
+                public Object updateCallback(com.google.cloud.firestore.Transaction t) throws Exception {
+
+                    DocumentReference sourceRef = dbFirestore.collection("accounts").document(transactionRequest.getSourceAccountNumber());
+                    DocumentReference transRef = dbFirestore.collection("transactions").document(transaction.getTransactionId());
+
+                    DocumentSnapshot sourceSnap = t.get(sourceRef).get();
+
                     accountService.addBalanceTx(t, transactionRequest.getDestinationAccountNumber(), transactionRequest.getAmount());
 
                     t.update(transRef, "status", "SUCCESS");

@@ -59,4 +59,37 @@ public class TransactionController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
         }
     }
+
+    @PostMapping("/receiveTransaction")
+    public ResponseEntity<ApiResponse<Transaction>> receiveTransaction(@RequestBody TransactionRequest request) {
+        try {
+            Transaction result = transactionService.receiveTransfer(request);
+
+            ApiResponse<Transaction> response = ApiResponse.<Transaction>builder()
+                    .code(STATUS_CODE_OK)
+                    .message("Giao dịch thành công")
+                    .result(result)
+                    .build();
+
+            return ResponseEntity.status(HttpStatus.OK).body(response);
+
+        } catch (IllegalArgumentException e) {
+            ApiResponse<Transaction> error = ApiResponse.<Transaction>builder()
+                    .code(STATUS_CODE_FAILED)
+                    .message(e.getMessage())
+                    .result(null)
+                    .build();
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+
+            ApiResponse<Transaction> error = ApiResponse.<Transaction>builder()
+                    .code(STATUS_CODE_FAILED)
+                    .message("Giao dịch thất bại: " + e.getMessage())
+                    .result(null)
+                    .build();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+        }
+    }
 }

@@ -69,4 +69,26 @@ public class BankService {
 
         return banks;
     }
+
+    public Bank getBank(String bankSymbol)  throws ExecutionException, InterruptedException  {
+        Firestore dbFirestore = FirestoreClient.getFirestore();
+
+        DocumentSnapshot documentSnapshot = dbFirestore.collection("banks").document(bankSymbol).get().get();
+
+        if (documentSnapshot.exists()) {
+            Bank bank = documentSnapshot.toObject(Bank.class);
+
+            if (bank != null) {
+                bank.setCreatedAt(null);
+                bank.setUpdatedAt(null);
+                return bank;
+            }
+            else {
+                throw new IllegalArgumentException("Bank not found");
+            }
+        }
+        else {
+            throw new IllegalArgumentException("Bank not found");
+        }
+    }
 }

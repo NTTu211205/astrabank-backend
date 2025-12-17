@@ -1,5 +1,6 @@
 package org.astrabank.controllers;
 
+import com.google.protobuf.Api;
 import org.astrabank.dto.AccountRequest;
 import org.astrabank.dto.ApiResponse;
 import org.astrabank.dto.BankRequest;
@@ -86,6 +87,40 @@ public class BankController {
                     .result(null)
                     .build();
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
+    }
+
+    @GetMapping("/{bankSymbol}")
+    public ResponseEntity<ApiResponse<Bank>>  getBank(@PathVariable("bankSymbol") String bankSymbol){
+        try {
+            Bank bank = bankService.getBank(bankSymbol);
+            if (bank != null) {
+                ApiResponse<Bank> response = ApiResponse.<Bank>builder()
+                        .code(STATUS_CODE_OK)
+                        .message("Bank found successfully")
+                        .result(bank)
+                        .build();
+
+                return ResponseEntity.status(HttpStatus.OK).body(response);
+            }
+            else {
+                ApiResponse<Bank> response = ApiResponse.<Bank>builder()
+                        .code(STATUS_CODE_OK)
+                        .message("Bank not found")
+                        .result(null)
+                        .build();
+
+                return ResponseEntity.status(HttpStatus.OK).body(response);
+            }
+        }
+        catch (Exception e) {
+            ApiResponse<Bank> error = ApiResponse.<Bank>builder()
+                    .code(STATUS_CODE_FAILED)
+                    .message(e.getMessage())
+                    .result(null)
+                    .build();
+
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
         }
     }
 }

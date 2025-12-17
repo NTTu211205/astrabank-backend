@@ -6,6 +6,7 @@ import com.google.firebase.cloud.FirestoreClient;
 import org.astrabank.dto.AccountRequest;
 import org.astrabank.dto.AccountResponse;
 import org.astrabank.models.Account;
+import org.astrabank.models.Bank;
 import org.astrabank.models.User;
 import org.astrabank.utils.AccountNumberGenerator;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -90,6 +91,26 @@ public class AccountService {
         return null;
     }
 
+//    public AccountResponse findAccount(String accountNumber, String bankSymbol) throws ExecutionException, InterruptedException {
+//        Firestore dbFirestore = FirestoreClient.getFirestore();
+//
+//        DocumentSnapshot documentSnapshot = dbFirestore.collection("accounts").document(bankSymbol).get().get();
+//
+//        if (documentSnapshot.exists()) {
+//            Bank bank = documentSnapshot.toObject(Bank.class);
+//
+//            if (bank != null) {
+//
+//            }
+//            else {
+//                throw new IllegalArgumentException("Bank not found");
+//            }
+//        }
+//        else {
+//            throw new IllegalArgumentException("Bank not found");
+//        }
+//    }
+
     public Account getAccountForUSer(String userId, String accountType)
             throws ExecutionException, InterruptedException, IllegalArgumentException {
         Firestore dbFirestore = FirestoreClient.getFirestore();
@@ -171,5 +192,4 @@ public class AccountService {
         DocumentReference ref = FirestoreClient.getFirestore().collection("accounts").document(accountNumber);
         t.update(ref, "balance", FieldValue.increment(amount));
     }
-
 }

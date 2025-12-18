@@ -4,6 +4,7 @@ import com.google.api.core.ApiFuture;
 import com.google.cloud.firestore.*;
 import com.google.firebase.cloud.FirestoreClient;
 import org.astrabank.constant.TransactionStatus;
+import org.astrabank.constant.TransactionType;
 import org.astrabank.dto.AccountResponse;
 import org.astrabank.dto.TransactionRequest;
 import org.astrabank.models.Bank;
@@ -481,5 +482,159 @@ public class TransactionService {
         }
 
         return allTransactions;
+    }
+
+    public Transaction processDeposit(TransactionRequest transactionRequest)
+            throws ExecutionException, InterruptedException, IllegalArgumentException {
+
+        // 1. Kiểm tra số tiền nạp phải hợp lệ (> 0)
+        if (transactionRequest.getAmount() <= 0) {
+            throw new IllegalArgumentException("Số tiền nạp phải lớn hơn 0");
+        }
+
+        // 2. Tạo bản ghi Transaction (Trạng thái PENDING)
+        Firestore dbFirestore = FirestoreClient.getFirestore();
+        Transaction transaction = new Transaction();
+        DocumentReference documentReference = dbFirestore.collection("transactions").document();
+
+        transaction.setTransactionId(documentReference.getId());
+
+        // Với nạp tiền: Source là hệ thống/cổng thanh toán, Destination là tài khoản User
+        transaction.setSourceAcc("SYSTEM_DEPOSIT"); // Hoặc lấy từ cổng thanh toán (Momo, Stripe...)
+        transaction.setBankSourceSymbol("INTERNAL");
+
+        transaction.setDestinationAcc(transactionRequest.getDestinationAccountNumber()); // Tài khoản nhận tiền
+        transaction.setBankDesSymbol(transactionRequest.getDestinationBankSymbol());
+
+        transaction.setStatus(TransactionStatus.PENDING);
+        transaction.setAmount(transactionRequest.getAmount());
+        transaction.setType(TransactionType.DEPOSIT); // Hoặc dùng transactionRequest.getTransactionType() nếu đã set
+        transaction.setDescription(transactionRequest.getDescription());
+        transaction.setCreatedAt(new Date());
+        transaction.setUpdatedAt(new Date());
+
+        // Các trường tên người gửi/nhận
+        transaction.setSenderName("SYSTEM");
+        transaction.setReceiverName(transactionRequest.getReceiverName());
+
+        // Lưu transaction xuống DB với trạng thái PENDING
+        ApiFuture<WriteResult> future = dbFirestore
+                .collection("transactions")
+                .document(transaction.getTransactionId())
+                .set(transaction);
+        future.get(); // Chờ lưu xong
+
+        // 3. Thực hiện Transaction trong Firestore (Cộng tiền)
+        try {
+            dbFirestore.runTransaction(t -> {
+                DocumentReference transRef = dbFirestore.collection("transactions").document(transaction.getTransactionId());
+
+                // --- KHÔNG CẦN CHECK BALANCE VÌ ĐÂY LÀ NẠP TIỀN ---
+
+                // Gọi service cộng tiền (Reuse lại hàm có sẵn của bạn)
+                accountService.addBalanceTx(t, transactionRequest.getDestinationAccountNumber(), transactionRequest.getAmount());
+
+                // Cập nhật trạng thái giao dịch thành công
+                t.update(transRef, "status", "SUCCESS");
+                t.update(transRef, "updatedAt", new Date());
+
+                return null;
+            }).get();
+
+            // Cập nhật object trả về
+            transaction.setStatus(TransactionStatus.SUCCESS);
+            return transaction;
+
+        } catch (Exception e) {
+            // Nếu lỗi, cập nhật trạng thái FAILED
+            dbFirestore.collection("transactions").document(transaction.getTransactionId()).update("status", "FAILED");
+
+            throw new RuntimeException("Nạp tiền thất bại: " + e.getMessage());
+        }
+    }
+
+    public Transaction processWithdrawal(TransactionRequest transactionRequest)
+            throws ExecutionException, InterruptedException, IllegalArgumentException {
+
+        // 1. Kiểm tra đầu vào
+        if (transactionRequest.getAmount() <= 0) {
+            throw new IllegalArgumentException("Số tiền rút phải lớn hơn 0");
+        }
+
+        // 2. Kiểm tra số dư sơ bộ (Optional - Để báo lỗi nhanh cho User đỡ phải gọi xuống DB sâu)
+        // Lưu ý: Việc kiểm tra chính xác 100% sẽ nằm trong Transaction bên dưới
+        Boolean isBalanceEnough = accountService.checkBalance(
+                transactionRequest.getSourceAccountNumber(),
+                transactionRequest.getAmount()
+        );
+        if (!isBalanceEnough) {
+            throw new IllegalArgumentException("Số dư không đủ để thực hiện giao dịch");
+        }
+
+        // 3. Tạo Transaction Record (Trạng thái PENDING)
+        Firestore dbFirestore = FirestoreClient.getFirestore();
+        Transaction transaction = new Transaction();
+        DocumentReference documentReference = dbFirestore.collection("transactions").document();
+
+        transaction.setTransactionId(documentReference.getId());
+
+        // RÚT TIỀN: Source là User, Destination là ATM/System
+        transaction.setSourceAcc(transactionRequest.getSourceAccountNumber());
+        transaction.setBankSourceSymbol(transactionRequest.getSourceBankSymbol()); // Bank của User
+
+        transaction.setDestinationAcc("ATM_WITHDRAWAL"); // Hoặc ID cây ATM
+        transaction.setBankDesSymbol("CASH");
+
+        transaction.setStatus(TransactionStatus.PENDING);
+        transaction.setAmount(transactionRequest.getAmount());
+        transaction.setType(TransactionType.WITHDRAW);
+        transaction.setDescription(transactionRequest.getDescription());
+        transaction.setCreatedAt(new Date());
+        transaction.setUpdatedAt(new Date());
+
+        transaction.setSenderName(transactionRequest.getSenderName());
+        transaction.setReceiverName("Cash Withdrawal");
+
+        // Lưu PENDING xuống DB
+        ApiFuture<WriteResult> future = dbFirestore
+                .collection("transactions")
+                .document(transaction.getTransactionId())
+                .set(transaction);
+        future.get();
+
+        // 4. Thực hiện Transaction Firestore (Trừ tiền an toàn)
+        try {
+            dbFirestore.runTransaction(t -> {
+                DocumentReference transRef = dbFirestore.collection("transactions").document(transaction.getTransactionId());
+                DocumentReference sourceRef = dbFirestore.collection("accounts").document(transactionRequest.getSourceAccountNumber());
+
+                // A. Đọc số dư mới nhất trong Transaction (Quan trọng để tránh Race Condition)
+                DocumentSnapshot sourceSnap = t.get(sourceRef).get();
+                Double currentBalance = sourceSnap.getDouble("balance"); // Hoặc getLong tuỳ DB bạn lưu
+
+                if (currentBalance == null || currentBalance < transactionRequest.getAmount()) {
+                    throw new IllegalArgumentException("Số dư không đủ (Kiểm tra lại lúc giao dịch)");
+                }
+
+                // B. Trừ tiền tài khoản User
+                accountService.deductBalanceTx(t, transactionRequest.getSourceAccountNumber(), transactionRequest.getAmount());
+
+                // C. Update trạng thái thành công
+                t.update(transRef, "status", "SUCCESS");
+                t.update(transRef, "updatedAt", new Date());
+
+                return null;
+            }).get();
+
+            transaction.setStatus(TransactionStatus.SUCCESS);
+            return transaction;
+
+        } catch (Exception e) {
+            // Nếu lỗi (không đủ tiền, lỗi DB...), cập nhật FAILED
+            dbFirestore.collection("transactions").document(transaction.getTransactionId()).update("status", "FAILED");
+
+            // Ném lỗi ra để Controller bắt
+            throw new RuntimeException("Rút tiền thất bại: " + e.getMessage());
+        }
     }
 }

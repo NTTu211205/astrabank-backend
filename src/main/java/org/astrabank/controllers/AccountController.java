@@ -3,6 +3,7 @@ package org.astrabank.controllers;
 import org.astrabank.dto.AccountRequest;
 import org.astrabank.dto.AccountResponse;
 import org.astrabank.dto.ApiResponse;
+import org.astrabank.dto.SavingAccountRequest;
 import org.astrabank.models.Account;
 import org.astrabank.services.AccountService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,6 +34,29 @@ public class AccountController {
             @RequestBody AccountRequest accountRequest) {
         try {
             Account account = accountService.createAccount(accountRequest);
+
+            ApiResponse<Account> response = ApiResponse.<Account>builder()
+                    .code(STATUS_CODE_OK)
+                    .message("Account created successfully")
+                    .result(account)
+                    .build();
+
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (Exception e) {
+            ApiResponse<Account> error = ApiResponse.<Account>builder()
+                    .code(STATUS_CODE_FAILED)
+                    .message(e.getMessage())
+                    .result(null)
+                    .build();
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        }
+    }
+
+    @PostMapping("/create-saving-account")
+    public ResponseEntity<ApiResponse<Account>> createSavingAccount(
+            @RequestBody SavingAccountRequest accountRequest) {
+        try {
+            Account account = accountService.createSavingAccount(accountRequest);
 
             ApiResponse<Account> response = ApiResponse.<Account>builder()
                     .code(STATUS_CODE_OK)

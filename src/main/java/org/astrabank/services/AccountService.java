@@ -5,6 +5,7 @@ import com.google.cloud.firestore.*;
 import com.google.firebase.cloud.FirestoreClient;
 import org.astrabank.dto.AccountRequest;
 import org.astrabank.dto.AccountResponse;
+import org.astrabank.dto.SavingAccountRequest;
 import org.astrabank.models.Account;
 import org.astrabank.models.Bank;
 import org.astrabank.models.User;
@@ -228,4 +229,24 @@ public class AccountService {
         DocumentReference ref = FirestoreClient.getFirestore().collection("accounts").document(accountNumber);
         t.update(ref, "balance", FieldValue.increment(amount));
     }
+
+    public Account createSavingAccount(SavingAccountRequest accountRequest) throws ExecutionException, InterruptedException {
+        Firestore dbFirestore = FirestoreClient.getFirestore();
+
+        String accountNumber = generateUniqueAccountNumber(dbFirestore);
+
+        Account account = new Account();
+        account.setAccountNumber(accountNumber);
+        account.setAccountStatus(true);
+        account.setAccountType(accountRequest.getAccountType());
+        account.setBalance(accountRequest.getBalance());
+        account.setCreatedAt(new Date());
+        account.setUserId(accountRequest.getUserId());
+        account.setInterestRate(0.045);
+
+        ApiFuture<WriteResult> future = dbFirestore.collection("accounts").document(accountNumber).set(account);
+
+        return account;
+    }
+
 }

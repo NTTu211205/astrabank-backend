@@ -143,4 +143,67 @@ public class TransactionController {
         }
     }
 
+    @PostMapping("/deposit")
+    public ResponseEntity<ApiResponse<Transaction>> deposit(@RequestBody TransactionRequest request) {
+        try {
+            // 1. Gọi Service xử lý nạp tiền
+            Transaction transactionResult = transactionService.processDeposit(request);
+
+            // 2. Trả về kết quả thành công
+            ApiResponse<Transaction> response = ApiResponse.<Transaction>builder()
+                    .code(STATUS_CODE_OK) // Mã thành công (quy ước của bạn)
+                    .message("Nạp tiền thành công")
+                    .result(transactionResult)
+                    .build();
+
+            return ResponseEntity.ok(response);
+
+        } catch (IllegalArgumentException e) {
+            // Lỗi do input sai (Số tiền âm, v.v.)
+            return ResponseEntity.badRequest().body(ApiResponse.<Transaction>builder()
+                    .code(STATUS_CODE_FAILED)
+                    .message(e.getMessage())
+                    .result(null)
+                    .build());
+
+        } catch (Exception e) {
+            // Lỗi hệ thống hoặc lỗi DB
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.<Transaction>builder()
+                            .code(STATUS_CODE_FAILED)
+                            .message("Lỗi hệ thống: " + e.getMessage())
+                            .result(null)
+                            .build());
+        }
+    }
+
+    @PostMapping("/withdraw")
+    public ResponseEntity<ApiResponse<Transaction>> withdraw(@RequestBody TransactionRequest request) {
+        try {
+            // Gọi Service rút tiền
+            Transaction result = transactionService.processWithdrawal(request);
+
+            return ResponseEntity.ok(ApiResponse.<Transaction>builder()
+                    .code(STATUS_CODE_OK)
+                    .message("Rút tiền thành công")
+                    .result(result)
+                    .build());
+
+        } catch (IllegalArgumentException e) {
+            // Lỗi do User (Không đủ tiền, số âm...)
+            return ResponseEntity.badRequest().body(ApiResponse.<Transaction>builder()
+                    .code(STATUS_CODE_FAILED)
+                    .message(e.getMessage())
+                    .build());
+
+        } catch (Exception e) {
+            // Lỗi hệ thống
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.<Transaction>builder()
+                            .code(STATUS_CODE_FAILED)
+                            .message("Lỗi giao dịch: " + e.getMessage())
+                            .build());
+        }
+    }
 }

@@ -17,10 +17,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.Collections;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 
 @Service
@@ -190,16 +187,17 @@ public class AccountService {
                 .whereEqualTo("userId", userId)
                 .get().get();
 
+        List<Account> accounts = new ArrayList<>();
         if (!querySnapshot.isEmpty()) {
             for (QueryDocumentSnapshot document : querySnapshot) {
                 Account account = document.toObject(Account.class);
-                return Collections.singletonList(account);
+                accounts.add(account);
             }
+            return accounts;
         }
         else {
             throw new IllegalArgumentException("User not found");
         }
-        return null;
     }
 
     public ApiFuture<WriteResult> subtractBalance(String accountNumber, double amount) {

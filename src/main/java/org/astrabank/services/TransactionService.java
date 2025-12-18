@@ -1,10 +1,7 @@
 package org.astrabank.services;
 
 import com.google.api.core.ApiFuture;
-import com.google.cloud.firestore.DocumentReference;
-import com.google.cloud.firestore.DocumentSnapshot;
-import com.google.cloud.firestore.Firestore;
-import com.google.cloud.firestore.WriteResult;
+import com.google.cloud.firestore.*;
 import com.google.firebase.cloud.FirestoreClient;
 import org.astrabank.constant.TransactionStatus;
 import org.astrabank.dto.AccountResponse;
@@ -18,7 +15,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 @Service
@@ -437,5 +436,50 @@ public class TransactionService {
             e.printStackTrace();
             throw new Exception("Lỗi khi gọi POST tới " + url + ": " + e.getMessage());
         }
+    }
+
+    public List<Transaction> getTransactionHistory(String accountNumber) throws Exception {
+        List<Transaction> allTransactions = new ArrayList<>();
+
+        try {
+            Firestore dbFirestore = FirestoreClient.getFirestore();
+
+            Query querySent = dbFirestore.collection("transactions").whereEqualTo("sourceAcc", accountNumber);
+            //.whereEqualTo("status", "SUCCESS");
+
+            // 2. Tìm các giao dịch là NGƯỜI NHẬN (Tiền về)
+            Query queryReceived = dbFirestore.collection("transactions").whereEqualTo("destinationAcc", accountNumber);
+            //.whereEqualTo("status", "SUCCESS");
+
+            // 3. Thực thi 2 câu lệnh song song (Asynchronous) để tiết kiệm thời gian
+            ApiFuture<QuerySnapshot> futureSent = querySent.get();
+            ApiFuture<QuerySnapshot> futureReceived = queryReceived.get();
+
+            // 4. Lấy dữ liệu và map sang Object
+            List<QueryDocumentSnapshot> sentDocs = futureSent.get().getDocuments();
+            List<QueryDocumentSnapshot> receivedDocs = futureReceived.get().getDocuments();
+
+            for (DocumentSnapshot doc : sentDocs) {
+                Transaction t = doc.toObject(Transaction.class);
+                allTransactions.add(t);
+            }
+
+            for (DocumentSnapshot doc : receivedDocs) {
+                Transaction t = doc.toObject(Transaction.class);
+                // t.setTransactionId(doc.getId());
+                allTransactions.add(t);
+            }
+
+            allTransactions.sort((t1, t2) -> {
+                if (t1.getCreatedAt() == null || t2.getCreatedAt() == null) return 0;
+                return t2.getCreatedAt().compareTo(t1.getCreatedAt()); // Giảm dần (Descending)
+            });
+
+        } catch (InterruptedException | ExecutionException e) {
+            e.printStackTrace();
+            throw new RuntimeException("Lỗi khi lấy lịch sử giao dịch: " + e.getMessage());
+        }
+
+        return allTransactions;
     }
 }

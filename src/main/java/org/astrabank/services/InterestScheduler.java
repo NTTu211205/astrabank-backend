@@ -14,9 +14,6 @@ import java.util.concurrent.ExecutionException;
 
 @Component
 public class InterestScheduler {
-
-    private final Firestore dbFirestore = FirestoreClient.getFirestore();
-
     // Các hằng số
     private static final String COLLECTION_ACCOUNTS = "accounts";
     private static final String COLLECTION_TRANSACTIONS = "transactions";
@@ -25,6 +22,7 @@ public class InterestScheduler {
     @Scheduled(cron = "0 0 0 1 * ?")
 //     @Scheduled(fixedRate = 60000)
     public void payMonthlyDemandInterest() {
+        Firestore dbFirestore = FirestoreClient.getFirestore();
         System.out.println("--- [SCHEDULER] BẮT ĐẦU TRẢ LÃI KHÔNG KỲ HẠN ---");
 
         try {
@@ -48,6 +46,7 @@ public class InterestScheduler {
     }
 
     private void processInterestForAccount(DocumentSnapshot doc) {
+        Firestore dbFirestore = FirestoreClient.getFirestore();
         String accId = doc.getId();
 
         Long currentBalance = doc.getLong("balance");

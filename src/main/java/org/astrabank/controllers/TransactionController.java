@@ -206,4 +206,23 @@ public class TransactionController {
                             .build());
         }
     }
+
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<ApiResponse<List<Transaction>>> getHistoryByUser(@PathVariable String userId) {
+        try {
+            List<Transaction> transactions = transactionService.getAllTransactionsByUserId(userId);
+
+            return ResponseEntity.ok(ApiResponse.<List<Transaction>>builder()
+                    .code(STATUS_CODE_OK)
+                    .message("Lấy danh sách giao dịch thành công")
+                    .result(transactions)
+                    .build());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.<List<Transaction>>builder()
+                            .code(STATUS_CODE_FAILED)
+                            .message("Lỗi: " + e.getMessage())
+                            .build());
+        }
+    }
 }

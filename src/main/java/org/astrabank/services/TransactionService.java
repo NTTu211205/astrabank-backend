@@ -16,9 +16,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 
 @Service
@@ -636,5 +634,59 @@ public class TransactionService {
             // Ném lỗi ra để Controller bắt
             throw new RuntimeException("Rút tiền thất bại: " + e.getMessage());
         }
+    }
+
+    public List<Transaction> getAllTransactionsByUserId(String userId) {
+        Firestore dbFirestore = FirestoreClient.getFirestore();
+        List<Transaction> finalResult = new ArrayList<>();
+        Set<String> processedTransactionIds = new HashSet<>(); // Dùng Set để lọc trùng lặp
+
+        try {
+            List<QueryDocumentSnapshot> accountDocs = dbFirestore.collection("accounts")
+                    .whereEqualTo("userId", userId)
+                    .get().get().getDocuments();
+
+            if (accountDocs.isEmpty()) {
+                return new ArrayList<>(); // User chưa có tài khoản nào
+            }
+
+            List<String> userAccountNumbers = new ArrayList<>();
+            for (DocumentSnapshot doc : accountDocs) {
+                userAccountNumbers.add(doc.getId());
+            }
+
+            List<ApiFuture<QuerySnapshot>> futures = new ArrayList<>();
+            CollectionReference transRef = dbFirestore.collection("transactions");
+
+            for (String accNum : userAccountNumbers) {
+                futures.add(transRef.whereEqualTo("sourceAcc", accNum).get());
+
+                futures.add(transRef.whereEqualTo("destinationAcc", accNum).get());
+            }
+
+            for (ApiFuture<QuerySnapshot> future : futures) {
+                List<QueryDocumentSnapshot> docs = future.get().getDocuments();
+
+                for (DocumentSnapshot doc : docs) {
+                    Transaction t = doc.toObject(Transaction.class);
+
+                    if (!processedTransactionIds.contains(t.getTransactionId())) {
+                        finalResult.add(t);
+                        processedTransactionIds.add(t.getTransactionId());
+                    }
+                }
+            }
+
+            finalResult.sort((t1, t2) -> {
+                if (t1.getCreatedAt() == null || t2.getCreatedAt() == null) return 0;
+                return t2.getCreatedAt().compareTo(t1.getCreatedAt());
+            });
+
+        } catch (InterruptedException | ExecutionException e) {
+            e.printStackTrace();
+            throw new RuntimeException("Lỗi lấy danh sách giao dịch: " + e.getMessage());
+        }
+
+        return finalResult;
     }
 }

@@ -8,12 +8,16 @@ import com.google.firebase.auth.FirebaseToken;
 import com.google.firebase.auth.UserRecord;
 import com.google.firebase.cloud.FirestoreClient;
 import com.google.firebase.iid.FirebaseInstanceId;
+import org.astrabank.dto.ChangePINRequest;
+import org.astrabank.dto.UpdateUserRequest;
 import org.astrabank.models.User;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 @Service
@@ -156,5 +160,73 @@ public class UserService {
         Boolean isMatch = passwordEncoder.matches(transactionPIN, user.getTransactionPIN());
         return isMatch;
 
+    }
+
+    public User updateUserProfile(String userId, UpdateUserRequest request) throws Exception {
+        Firestore  dbFirestore = FirestoreClient.getFirestore();
+        DocumentReference userRef = dbFirestore.collection("users").document(userId);
+
+        // 1. Kiểm tra User có tồn tại không
+        DocumentSnapshot snap = userRef.get().get();
+        if (!snap.exists()) {
+            throw new IllegalArgumentException("User không tồn tại");
+        }
+
+        Map<String, Object> updates = new HashMap<>();
+
+        // Chỉ put các trường nếu dữ liệu gửi lên khác null và không rỗng
+        if (request.getFullName() != null) updates.put("fullName", request.getFullName());
+        if (request.getDateOfBirth() != null) updates.put("dateOfBirth", request.getDateOfBirth());
+        if (request.getNationalID() != null) updates.put("nationalID", request.getNationalID());
+        if (request.getEmail() != null) updates.put("email", request.getEmail());
+        if (request.getPhone() != null) updates.put("phone", request.getPhone());
+        if (request.getAddress() != null) updates.put("address", request.getAddress());
+        if (request.getOccupation() != null) updates.put("occupation", request.getOccupation());
+        if (request.getCompanyName() != null) updates.put("companyName", request.getCompanyName());
+        if (request.getAverageSalary() != null) updates.put("averageSalary", request.getAverageSalary());
+
+        updates.put("updatedAt", new Date());
+
+        WriteResult result = userRef.update(updates).get();
+
+        // 4. Lấy lại dữ liệu mới nhất để trả về cho Client hiển thị
+        DocumentSnapshot updatedSnap = userRef.get().get();
+        return updatedSnap.toObject(User.class);
+    }
+
+    public void changeTransactionPin(ChangePINRequest request) throws Exception {
+        Firestore  dbFirestore = FirestoreClient.getFirestore();
+
+        if (request.getNewPin() == null || request.getNewPin().length() != 6) {
+            throw new IllegalArgumentException("Mã PIN mới phải bao gồm 6 chữ số");
+        }
+
+        if (!request.getNewPin().equals(request.getConfirmNewPin())) {
+            throw new IllegalArgumentException("Mã PIN xác nhận không khớp");
+        }
+
+        DocumentReference userRef = dbFirestore.collection("users").document(request.getUserId());
+        DocumentSnapshot snap = userRef.get().get();
+
+        if (!snap.exists()) {
+            throw new IllegalArgumentException("User không tồn tại");
+        }
+
+        // 2. Lấy PIN hiện tại trong DB
+        String currentPinInDb = snap.getString("transactionPIN");
+
+        if (currentPinInDb != null && !passwordEncoder.matches(request.getOldPin(),  currentPinInDb)) {
+            throw new IllegalArgumentException("Mã PIN cũ không chính xác");
+        }
+
+        if (currentPinInDb != null && currentPinInDb.equals(request.getNewPin())) {
+            throw new IllegalArgumentException("Mã PIN mới không được trùng với mã PIN hiện tại");
+        }
+
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("transactionPIN", passwordEncoder.encode(request.getNewPin()));
+        updates.put("updatedAt", new Date());
+
+        userRef.update(updates).get();
     }
 }

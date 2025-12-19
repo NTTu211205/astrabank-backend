@@ -2,6 +2,7 @@ package org.astrabank.controllers;
 
 import org.astrabank.dto.ApiResponse;
 import org.astrabank.dto.TransactionRequest;
+import org.astrabank.models.Notification;
 import org.astrabank.models.Transaction;
 import org.astrabank.services.AccountService;
 import org.astrabank.services.TransactionService;
@@ -207,19 +208,19 @@ public class TransactionController {
         }
     }
 
-    @GetMapping("/user/{userId}")
-    public ResponseEntity<ApiResponse<List<Transaction>>> getHistoryByUser(@PathVariable String userId) {
+    @GetMapping("/{userId}")
+    public ResponseEntity<ApiResponse<List<Notification>>> getHistoryByUser(@PathVariable String userId) {
         try {
-            List<Transaction> transactions = transactionService.getAllTransactionsByUserId(userId);
+            List<Notification> transactions = transactionService.getAllTransactionsByUserId(userId);
 
-            return ResponseEntity.ok(ApiResponse.<List<Transaction>>builder()
+            return ResponseEntity.ok(ApiResponse.<List<Notification>>builder()
                     .code(STATUS_CODE_OK)
                     .message("Lấy danh sách giao dịch thành công")
                     .result(transactions)
                     .build());
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.<List<Transaction>>builder()
+                    .body(ApiResponse.<List<Notification>>builder()
                             .code(STATUS_CODE_FAILED)
                             .message("Lỗi: " + e.getMessage())
                             .build());

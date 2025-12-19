@@ -1,8 +1,6 @@
 package org.astrabank.controllers;
 
-import org.astrabank.dto.ApiResponse;
-import org.astrabank.dto.FirebaseLoginRequest;
-import org.astrabank.dto.LoginRequest;
+import org.astrabank.dto.*;
 import org.astrabank.models.User;
 import org.astrabank.services.UserService;
 import org.springframework.http.HttpStatus;
@@ -162,6 +160,63 @@ public class UserController {
                     .result(null)
                     .build();
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        }
+    }
+
+    @PutMapping("/update-profile/{userId}")
+    public ResponseEntity<ApiResponse<User>> updateProfile(
+            @PathVariable String userId,
+            @RequestBody UpdateUserRequest request) {
+        try {
+            User updatedUser = userService.updateUserProfile(userId, request);
+
+            updatedUser.setPassword(null);
+            updatedUser.setTransactionPIN(null);
+
+            return ResponseEntity.ok(ApiResponse.<User>builder()
+                    .code(STATUS_CODE_OK)
+                    .message("Cập nhật thông tin thành công")
+                    .result(updatedUser)
+                    .build());
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.<User>builder()
+                    .code(STATUS_CODE_FAILED)
+                    .message(e.getMessage())
+                    .build());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.<User>builder()
+                            .code(STATUS_CODE_FAILED)
+                            .message("Lỗi hệ thống: " + e.getMessage())
+                            .build());
+        }
+    }
+
+    @PutMapping("/change-pin")
+    public ResponseEntity<ApiResponse<Boolean>> changePin(@RequestBody ChangePINRequest request) {
+        try {
+            userService.changeTransactionPin(request);
+
+            return ResponseEntity.ok(ApiResponse.<Boolean>builder()
+                    .code(STATUS_CODE_OK)
+                    .message("Change PIN successfully")
+                    .result(true)
+                    .build());
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.<Boolean>builder()
+                    .code(STATUS_CODE_FAILED)
+                    .message(e.getMessage())
+                    .result(false)
+                    .build());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.<Boolean>builder()
+                            .code(STATUS_CODE_OK)
+                            .message("Server error: " + e.getMessage())
+                            .result(false)
+                            .build());
         }
     }
 }

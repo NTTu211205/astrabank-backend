@@ -8,6 +8,7 @@ import org.astrabank.constant.TransactionType;
 import org.astrabank.dto.AccountResponse;
 import org.astrabank.dto.TransactionRequest;
 import org.astrabank.models.Bank;
+import org.astrabank.models.Notification;
 import org.astrabank.models.Transaction;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -636,10 +637,12 @@ public class TransactionService {
         }
     }
 
-    public List<Transaction> getAllTransactionsByUserId(String userId) {
+    public List<Notification> getAllTransactionsByUserId(String userId) {
         Firestore dbFirestore = FirestoreClient.getFirestore();
         List<Transaction> finalResult = new ArrayList<>();
         Set<String> processedTransactionIds = new HashSet<>(); // Dùng Set để lọc trùng lặp
+        List<Notification> notifications = new ArrayList<>();
+
 
         try {
             List<QueryDocumentSnapshot> accountDocs = dbFirestore.collection("accounts")
@@ -682,11 +685,33 @@ public class TransactionService {
                 return t2.getCreatedAt().compareTo(t1.getCreatedAt());
             });
 
+            for (Transaction t : finalResult) {
+
+                if (userAccountNumbers.contains(t.getSourceAcc()) && userAccountNumbers.contains(t.getDestinationAcc())) {
+                    String content = t.getSourceAcc() + " CHUYEN TIEN DEN TAI KHOAN " + t.getDestinationAcc() + " SO TIEN " + t.getAmount() + " LUC " + t.getCreatedAt() + ". MA GIAO DICH: " + t.getTransactionId();
+                    String title = "BIEN DONG SO DU";
+                    String amount = String.valueOf(t.getAmount());
+                    notifications.add(new Notification(content, title,  amount));
+                }
+                else if (userAccountNumbers.contains(t.getSourceAcc()) && !userAccountNumbers.contains(t.getDestinationAcc())){
+                    String title = "BIEN DONG SO DU -" + t.getAmount();
+                    String content = t.getSourceAcc() + " CHUYEN TIEN DEN TAI KHOAN CUA " + t.getReceiverName() + " SO TIEN " + t.getAmount() + " LUC " + t.getCreatedAt() + ". NOI DUNG: " + t.getDescription() + ". MA GIAO DICH: " + t.getTransactionId();
+                    String amount = "-" +  t.getAmount();
+                    notifications.add(new Notification(content, title, amount));
+                }
+                else  if (!userAccountNumbers.contains(t.getSourceAcc()) && userAccountNumbers.contains(t.getDestinationAcc())) {
+                    String title = "BIEN DONG SO DU +" + t.getAmount();
+                    String content = t.getSourceAcc() + " CHUYEN DEN TAI KHOAN CUA BAN " + t.getDestinationAcc() + " SO TIEN " + t.getAmount() + " LUC " + t.getCreatedAt() + ". NOI DUNG: " + t.getDescription() + ". MA GIAO DICH: " + t.getTransactionId();
+                    String amount = "+" +  t.getAmount();
+                    notifications.add(new Notification(content, title,  amount));
+                }
+            }
+
         } catch (InterruptedException | ExecutionException e) {
             e.printStackTrace();
             throw new RuntimeException("Lỗi lấy danh sách giao dịch: " + e.getMessage());
         }
 
-        return finalResult;
+        return notifications;
     }
 }

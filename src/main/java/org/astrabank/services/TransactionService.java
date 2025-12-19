@@ -17,6 +17,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
 
@@ -686,23 +688,24 @@ public class TransactionService {
             });
 
             for (Transaction t : finalResult) {
+                String moneyString = formatMoney(t.getAmount());
 
                 if (userAccountNumbers.contains(t.getSourceAcc()) && userAccountNumbers.contains(t.getDestinationAcc())) {
-                    String content = t.getSourceAcc() + " CHUYEN TIEN DEN TAI KHOAN " + t.getDestinationAcc() + " SO TIEN " + t.getAmount() + " LUC " + t.getCreatedAt() + ". MA GIAO DICH: " + t.getTransactionId();
+                    String content = t.getSourceAcc() + " CHUYEN TIEN DEN TAI KHOAN " + t.getDestinationAcc() + " SO TIEN " + moneyString + " LUC " + t.getCreatedAt() + ". MA GIAO DICH: " + t.getTransactionId();
                     String title = "BIEN DONG SO DU";
-                    String amount = String.valueOf(t.getAmount());
+                    String amount = String.valueOf(moneyString);
                     notifications.add(new Notification(content, title,  amount));
                 }
                 else if (userAccountNumbers.contains(t.getSourceAcc()) && !userAccountNumbers.contains(t.getDestinationAcc())){
-                    String title = "BIEN DONG SO DU -" + t.getAmount();
-                    String content = t.getSourceAcc() + " CHUYEN TIEN DEN TAI KHOAN CUA " + t.getReceiverName() + " SO TIEN " + t.getAmount() + " LUC " + t.getCreatedAt() + ". NOI DUNG: " + t.getDescription() + ". MA GIAO DICH: " + t.getTransactionId();
-                    String amount = "-" +  t.getAmount();
+                    String title = "BIEN DONG SO DU -" + moneyString;
+                    String content = t.getSourceAcc() + " CHUYEN TIEN DEN TAI KHOAN CUA " + t.getReceiverName() + " SO TIEN " + moneyString + " LUC " + t.getCreatedAt() + ". NOI DUNG: " + t.getDescription() + ". MA GIAO DICH: " + t.getTransactionId();
+                    String amount = "-" +  moneyString;
                     notifications.add(new Notification(content, title, amount));
                 }
                 else  if (!userAccountNumbers.contains(t.getSourceAcc()) && userAccountNumbers.contains(t.getDestinationAcc())) {
-                    String title = "BIEN DONG SO DU +" + t.getAmount();
-                    String content = t.getSourceAcc() + " CHUYEN DEN TAI KHOAN CUA BAN " + t.getDestinationAcc() + " SO TIEN " + t.getAmount() + " LUC " + t.getCreatedAt() + ". NOI DUNG: " + t.getDescription() + ". MA GIAO DICH: " + t.getTransactionId();
-                    String amount = "+" +  t.getAmount();
+                    String title = "BIEN DONG SO DU +" + moneyString;
+                    String content = t.getSourceAcc() + " CHUYEN DEN TAI KHOAN CUA BAN " + t.getDestinationAcc() + " SO TIEN " + moneyString + " LUC " + t.getCreatedAt() + ". NOI DUNG: " + t.getDescription() + ". MA GIAO DICH: " + t.getTransactionId();
+                    String amount = "+" +  moneyString;
                     notifications.add(new Notification(content, title,  amount));
                 }
             }
@@ -713,5 +716,13 @@ public class TransactionService {
         }
 
         return notifications;
+    }
+
+    private String formatMoney(long amount) {
+        DecimalFormat formatter = new DecimalFormat("#,###");
+        DecimalFormatSymbols symbols = new DecimalFormatSymbols();
+        symbols.setGroupingSeparator('.');
+        formatter.setDecimalFormatSymbols(symbols);
+        return formatter.format(amount);
     }
 }

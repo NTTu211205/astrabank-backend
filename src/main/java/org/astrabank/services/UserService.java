@@ -212,7 +212,6 @@ public class UserService {
             throw new IllegalArgumentException("User không tồn tại");
         }
 
-        // 2. Lấy PIN hiện tại trong DB
         String currentPinInDb = snap.getString("transactionPIN");
 
         if (currentPinInDb != null && !passwordEncoder.matches(request.getOldPin(),  currentPinInDb)) {

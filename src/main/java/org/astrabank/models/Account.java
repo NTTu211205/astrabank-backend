@@ -18,4 +18,14 @@ public class Account {
     private AccountType accountType;        // Loại tài khoản (saving, checking,...)
     private Date createdAt;
     private Double interestRate;
+
+    public Account(String userId, String accountNumber, boolean accountStatus,
+                   long balance, AccountType accountType, Date createdAt) {
+        this.userId = userId;
+        this.accountNumber = accountNumber;
+        this.AccountStatus = accountStatus;
+        this.balance = balance;
+        this.accountType = accountType;
+        this.createdAt = createdAt;
+    }
 }

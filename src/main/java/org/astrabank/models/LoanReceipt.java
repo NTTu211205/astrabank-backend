@@ -12,7 +12,9 @@ import java.util.Date;
 public class LoanReceipt {
     private String receiptId;
     private String loanId;
-    private String isPay;
+    private boolean paid;
+    private int period;
+    private long amount;
     private Date finalDate;
     private Date updatedAt;
 }

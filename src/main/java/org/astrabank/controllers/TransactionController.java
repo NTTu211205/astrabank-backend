@@ -20,7 +20,6 @@ public class TransactionController {
     private final int STATUS_CODE_OK = 200;
     private TransactionService transactionService;
 
-    @Autowired
     public TransactionController(TransactionService transactionService) {
         this.transactionService = transactionService;
     }

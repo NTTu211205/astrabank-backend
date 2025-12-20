@@ -1,11 +1,9 @@
 package org.astrabank.controllers;
 
-import org.astrabank.dto.AccountRequest;
-import org.astrabank.dto.AccountResponse;
-import org.astrabank.dto.ApiResponse;
-import org.astrabank.dto.SavingAccountRequest;
-import org.astrabank.models.Account;
+import org.astrabank.dto.*;
+import org.astrabank.models.*;
 import org.astrabank.services.AccountService;
+import org.astrabank.services.MortgageAccountService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 @RestController
 @RequestMapping("api/accounts")
@@ -21,12 +20,14 @@ public class AccountController {
     private final int STATUS_CODE_FAILED = 400;
     private final int STATUS_CODE_OK = 200;
     private final AccountService accountService;
+    private final MortgageAccountService mortgageAccountService;
     private final PathPatternRequestMatcher.Builder builder;
 
     @Autowired
-    public AccountController(AccountService accountService, PathPatternRequestMatcher.Builder builder) {
+    public AccountController(AccountService accountService, PathPatternRequestMatcher.Builder builder, MortgageAccountService mortgageAccountService) {
         this.accountService = accountService;
         this.builder = builder;
+        this.mortgageAccountService = mortgageAccountService;
     }
 
     @PostMapping("/create")
@@ -110,8 +111,7 @@ public class AccountController {
     @GetMapping("my-account")
     public ResponseEntity<ApiResponse<Account>> getMyAccount(
             @RequestParam String userId,
-            @RequestParam String accountType
-    ) {
+            @RequestParam String accountType) {
         try {
             Account account = accountService.getAccountForUSer(userId, accountType);
 
@@ -203,6 +203,177 @@ public class AccountController {
                     .build();
 
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        }
+    }
+
+    @PostMapping("/create-mortgage-account")
+    public ResponseEntity<ApiResponse<MortgageAccount>> openMortgage(@RequestBody MortgageAccountRequest request) {
+        try {
+            MortgageAccount account = accountService.createMortgageAccount(request);
+
+            return ResponseEntity.ok(ApiResponse.<MortgageAccount>builder()
+                    .code(STATUS_CODE_OK)
+                    .message("Create successfully")
+                    .result(account)
+                    .build());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.<MortgageAccount>builder()
+                            .code(STATUS_CODE_FAILED)
+                            .message("Create Failed: " + e.getMessage())
+                            .build());
+        }
+    }
+
+    @PostMapping("create-loan")
+    public ResponseEntity<ApiResponse<Loan>> createLoan(@RequestBody LoanRequest request) throws ExecutionException, InterruptedException {
+        try {
+            Loan newLoan = mortgageAccountService.createLoan(request);
+
+            return ResponseEntity.ok(ApiResponse.<Loan>builder()
+                    .code(STATUS_CODE_OK)
+                    .message("Đăng ký vay và giải ngân thành công!")
+                    .result(newLoan)
+                    .build());
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.<Loan>builder()
+                    .code(STATUS_CODE_FAILED)
+                    .message(e.getMessage())
+                    .result(null)
+                    .build());
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.<Loan>builder()
+                            .code(STATUS_CODE_FAILED)
+                            .message("Lỗi hệ thống: " + e.getMessage())
+                            .result(null)
+                            .build());
+        }
+    }
+
+    @PostMapping("pay-receipt")
+    public ResponseEntity<ApiResponse<Transaction>> payReceipt(@RequestBody ReceiptPaymentRequest request) {
+        try {
+            Transaction updatedReceipt = mortgageAccountService.pay(request);
+
+            return ResponseEntity.ok(ApiResponse.<Transaction>builder()
+                    .code(STATUS_CODE_OK)
+                    .message("Thanh toán hóa đơn thành công!")
+                    .result(updatedReceipt)
+                    .build());
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.<Transaction>builder()
+                    .code(STATUS_CODE_FAILED)
+                    .message(e.getMessage())
+                    .result(null)
+                    .build());
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.<Transaction>builder()
+                            .code(STATUS_CODE_FAILED)
+                            .message("Lỗi hệ thống: " + e.getMessage())
+                            .result(null)
+                            .build());
+        }
+    }
+
+    @GetMapping("/find-mortgage/{accountNumber}")
+    public ResponseEntity<ApiResponse<Account>> getMortgageAccount(@PathVariable String accountNumber) {
+        try {
+            Account account = accountService.findMortgageAccount(accountNumber);
+
+            if (account == null) {
+                return ResponseEntity.ok(ApiResponse.<Account>builder()
+                        .code(STATUS_CODE_OK)
+                        .message("Account not found")
+                        .result(null)
+                        .build());
+            }
+            else {
+                return ResponseEntity.ok(ApiResponse.<Account>builder()
+                        .code(STATUS_CODE_OK)
+                        .message("Lấy thông tin tài khoản thành công!")
+                        .result(account)
+                        .build());
+            }
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.<Account>builder()
+                            .code(STATUS_CODE_FAILED)
+                            .message(e.getMessage())
+                            .result(null)
+                            .build());
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.<Account>builder()
+                            .code(STATUS_CODE_FAILED)
+                            .message("Lỗi hệ thống: " + e.getMessage())
+                            .result(null)
+                            .build());
+        }
+    }
+
+    @GetMapping("/find-loan/{loanId}")
+    public ResponseEntity<ApiResponse<Loan>> getLoanById(@PathVariable String loanId) {
+        try {
+            Loan loan = mortgageAccountService.getLoanById(loanId);
+
+            if (loan == null) {
+                return ResponseEntity.ok(ApiResponse.<Loan>builder()
+                        .code(STATUS_CODE_OK)
+                        .message("Loan not found")
+                        .result(loan)
+                        .build());
+            }
+            else {
+                return ResponseEntity.ok(ApiResponse.<Loan>builder()
+                        .code(STATUS_CODE_OK)
+                        .message("Found successfully loan")
+                        .result(loan)
+                        .build());
+            }
+        } catch (IllegalArgumentException e) {
+            // Trả về 404 Not Found nếu ID sai
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.<Loan>builder()
+                            .code(STATUS_CODE_FAILED)
+                            .message(e.getMessage())
+                            .result(null)
+                            .build());
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.<Loan>builder()
+                            .code(STATUS_CODE_FAILED)
+                            .message("Error: " + e.getMessage())
+                            .result(null)
+                            .build());
+        }
+    }
+
+    @GetMapping("/find-receipt/{loanId}")
+    public ResponseEntity<ApiResponse<List<LoanReceipt>>> getReceiptsByLoanId(@PathVariable String loanId) {
+        try {
+            List<LoanReceipt> receipts = mortgageAccountService.findReceiptsByLoanId(loanId);
+
+            return ResponseEntity.ok(ApiResponse.<List<LoanReceipt>>builder()
+                    .code(STATUS_CODE_OK)
+                    .message("Find receipts successfully")
+                    .result(receipts)
+                    .build());
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.<List<LoanReceipt>>builder()
+                            .code(STATUS_CODE_FAILED)
+                            .message("Error: " + e.getMessage())
+                            .result(null)
+                            .build());
         }
     }
 }

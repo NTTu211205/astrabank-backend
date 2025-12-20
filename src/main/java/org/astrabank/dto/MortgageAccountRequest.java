@@ -12,7 +12,4 @@ import java.util.Date;
 @NoArgsConstructor
 public class MortgageAccountRequest {
     private String userId;           // ID người sở hữu tài khoản
-    private String accountNumber;    // Số tài khoản
-    private Boolean isLoan;
-
 }

@@ -108,7 +108,7 @@ public class UserController {
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<User>> login(@RequestBody LoginRequest loginRequest) {
         try {
-            User user = userService.login(loginRequest.getEmail(), loginRequest.getPassword());
+            User user = userService.login(loginRequest.getEmail(), loginRequest.getPin());
 
             if (user != null) {
                 ApiResponse<User> response = ApiResponse.<User>builder()
@@ -122,7 +122,7 @@ public class UserController {
             else {
                 ApiResponse<User> error = ApiResponse.<User>builder()
                         .code(STATUS_CODE_OK)
-                        .message("Email or password is invalid")
+                        .message("Email or pin code is invalid")
                         .result(null)
                         .build();
 
@@ -216,6 +216,44 @@ public class UserController {
                             .code(STATUS_CODE_OK)
                             .message("Server error: " + e.getMessage())
                             .result(false)
+                            .build());
+        }
+    }
+
+    @GetMapping("/find-by-email/{email}")
+    public ResponseEntity<ApiResponse<User>> findAccountByEmail(@PathVariable("email") String email) {
+        try {
+            User user = userService.findAccountByEmail(email);
+
+            if (user == null) {
+                return ResponseEntity.ok(ApiResponse.<User>builder()
+                        .code(STATUS_CODE_OK)
+                        .message("User not found")
+                        .result(null)
+                        .build());
+            }
+            else {
+                return ResponseEntity.ok(ApiResponse.<User>builder()
+                        .code(STATUS_CODE_OK)
+                        .message("Find user successfully")
+                        .result(user)
+                        .build());
+            }
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.<User>builder()
+                            .code(STATUS_CODE_FAILED)
+                            .message(e.getMessage())
+                            .result(null)
+                            .build());
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.<User>builder()
+                            .code(STATUS_CODE_FAILED)
+                            .message("Lỗi hệ thống: " + e.getMessage())
+                            .result(null)
                             .build());
         }
     }

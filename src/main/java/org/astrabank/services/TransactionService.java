@@ -6,6 +6,8 @@ import com.google.firebase.cloud.FirestoreClient;
 import org.astrabank.constant.TransactionStatus;
 import org.astrabank.constant.TransactionType;
 import org.astrabank.dto.AccountResponse;
+import org.astrabank.dto.DisbursementRequest;
+import org.astrabank.dto.ReceiptPaymentRequest;
 import org.astrabank.dto.TransactionRequest;
 import org.astrabank.models.Bank;
 import org.astrabank.models.Notification;
@@ -79,41 +81,6 @@ public class TransactionService {
 
         // tru tien
         // cong tien
-
-//        try {
-//            dbFirestore.runTransaction(new com.google.cloud.firestore.Transaction.Function<Object>() {
-//                @Override
-//                public Object updateCallback(com.google.cloud.firestore.Transaction transaction) throws Exception {
-//                    return null;
-//                }
-//            });
-//
-//            accountService.subtractBalance(transaction.getSourceAcc(), transaction.getAmount()).get();
-//            wasSubtracted = true;
-//
-//            accountService.addBalance(transaction.getDestinationAcc(), transaction.getAmount()).get();
-//            wasAdded = true;
-//
-//            transaction.setStatus(TransactionStatus.SUCCESS);
-//            transaction.setUpdatedAt(new Date());
-//
-//            // Lưu trạng thái mới xuống DB
-//            dbFirestore.collection("transactions").document(transaction.getTransactionId()).set(transaction);
-//
-//            // (Gửi mail ở đây nếu cần...)
-//
-//            return transaction;
-//        }
-//        catch (InterruptedException | ExecutionException e) {
-//            dbFirestore.collection("transactions").document(transaction.getTransactionId()).update("status", "FAILED");
-//
-//            // refund...
-//            if (wasSubtracted && !wasAdded) {
-//                // refund
-//            }
-//
-//            throw new RuntimeException("Giao dịch thất bại: " + e.getMessage());
-//        }
         try {
             dbFirestore.runTransaction(new com.google.cloud.firestore.Transaction.Function<Object>() {
                 @Override
@@ -123,6 +90,10 @@ public class TransactionService {
                     DocumentReference transRef = dbFirestore.collection("transactions").document(transaction.getTransactionId());
 
                     DocumentSnapshot sourceSnap = t.get(sourceRef).get();
+
+                    if (Objects.equals(sourceSnap.getString("accountType"), "MORTGAGE")) {
+                        throw new IllegalArgumentException("Số tài khoản nguồn không hợp lệ");
+                    }
 
                     Long currentBalance = sourceSnap.getLong("balance");
                     if (currentBalance == null || currentBalance < transactionRequest.getAmount()) {
@@ -724,5 +695,97 @@ public class TransactionService {
         symbols.setGroupingSeparator('.');
         formatter.setDecimalFormatSymbols(symbols);
         return formatter.format(amount);
+    }
+
+    public Transaction processDisbursement(com.google.cloud.firestore.Transaction firebaseTransaction, DisbursementRequest transactionRequest)
+            throws ExecutionException, InterruptedException, IllegalArgumentException {
+
+        System.out.println("checking amount");
+        if (transactionRequest.getAmount() <= 0) {
+            throw new IllegalArgumentException("Số tiền nạp phải lớn hơn 0");
+        }
+
+        Firestore dbFirestore = FirestoreClient.getFirestore();
+        Transaction transaction = new Transaction();
+        DocumentReference documentReference = dbFirestore.collection("transactions").document();
+        transaction.setTransactionId(documentReference.getId());
+        transaction.setSourceAcc("MORTGAGE_SYSTEM"); // Hoặc lấy từ cổng thanh toán (Momo, Stripe...)
+        transaction.setBankSourceSymbol("INTERNAL");
+        transaction.setDestinationAcc(transactionRequest.getDestinationAccountNumber()); // Tài khoản nhận tiền
+        transaction.setBankDesSymbol(transactionRequest.getDestinationBankSymbol());
+        transaction.setStatus(TransactionStatus.PENDING);
+        transaction.setAmount(transactionRequest.getAmount());
+        transaction.setType(TransactionType.DEPOSIT); // Hoặc dùng transactionRequest.getTransactionType() nếu đã set
+        transaction.setDescription("GIAI NGAN KHOAN VAY THE CHAP");
+        transaction.setCreatedAt(new Date());
+        transaction.setUpdatedAt(new Date());
+        transaction.setSenderName("SYSTEM");
+        transaction.setReceiverName(transactionRequest.getReceiverName());
+
+        // Lưu transaction xuống DB với trạng thái PENDING
+        System.out.println("Saving transaction");
+
+        firebaseTransaction.set(documentReference, transaction);
+
+        accountService.addBalanceTx(firebaseTransaction, transaction.getDestinationAcc(),  transaction.getAmount());
+
+        firebaseTransaction.update(documentReference, "status", "SUCCESS");
+
+        firebaseTransaction.update(documentReference, "updated", new Date());
+
+        return transaction;
+    }
+
+    public Transaction processPaymentReceipt(com.google.cloud.firestore.Transaction firebaseTransaction, ReceiptPaymentRequest transactionRequest,long amount, String description)
+            throws ExecutionException, InterruptedException, IllegalArgumentException {
+
+        // 1. Kiểm tra đầu vào
+        if (amount <= 0) {
+            throw new IllegalArgumentException("Số tiền rút phải lớn hơn 0");
+        }
+
+        Boolean isBalanceEnough = accountService.checkBalance(
+                transactionRequest.getSourceAccountNumber(),
+                amount
+        );
+        if (!isBalanceEnough) {
+            throw new IllegalArgumentException("Số dư không đủ để thực hiện giao dịch");
+        }
+
+        Firestore dbFirestore = FirestoreClient.getFirestore();
+
+        DocumentReference sourceRef = dbFirestore.collection("accounts").document(transactionRequest.getSourceAccountNumber());
+        DocumentSnapshot sourceSnap = firebaseTransaction.get(sourceRef).get();
+        Double currentBalance = sourceSnap.getDouble("balance");
+        if (currentBalance == null || currentBalance < amount) {
+            throw new IllegalArgumentException("Số dư không đủ (Kiểm tra lại lúc giao dịch)");
+        }
+
+        Transaction transaction = new Transaction();
+        DocumentReference documentReference = dbFirestore.collection("transactions").document();
+        transaction.setTransactionId(documentReference.getId());
+        transaction.setSourceAcc(transactionRequest.getSourceAccountNumber());
+        transaction.setBankSourceSymbol(transactionRequest.getSourceBankSymbol()); // Bank của User
+        transaction.setDestinationAcc("MORTGAGE_SYSTEM"); // Hoặc ID cây ATM
+        transaction.setBankDesSymbol("ATB");
+        transaction.setStatus(TransactionStatus.PENDING);
+        transaction.setAmount(amount);
+        transaction.setType(TransactionType.WITHDRAW);
+        transaction.setDescription(description);
+        transaction.setCreatedAt(new Date());
+        transaction.setUpdatedAt(new Date());
+        transaction.setSenderName(transactionRequest.getSenderName());
+        transaction.setReceiverName("MORTGAGE_SYSTEM");
+        firebaseTransaction.set(documentReference, transaction);
+
+        accountService.deductBalanceTx(firebaseTransaction, transactionRequest.getSourceAccountNumber(), amount);
+
+        DocumentReference newDocumentReference = dbFirestore.collection("transactions").document(transaction.getTransactionId());
+        firebaseTransaction.update(newDocumentReference, "status", "SUCCESS");
+        firebaseTransaction.update(newDocumentReference, "updatedAt", new Date());
+        transaction.setStatus(TransactionStatus.SUCCESS);
+        transaction.setUpdatedAt(new Date());
+
+        return transaction;
     }
 }

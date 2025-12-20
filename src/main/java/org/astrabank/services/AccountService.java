@@ -3,11 +3,14 @@ package org.astrabank.services;
 import com.google.api.core.ApiFuture;
 import com.google.cloud.firestore.*;
 import com.google.firebase.cloud.FirestoreClient;
+import org.astrabank.constant.AccountType;
 import org.astrabank.dto.AccountRequest;
 import org.astrabank.dto.AccountResponse;
+import org.astrabank.dto.MortgageAccountRequest;
 import org.astrabank.dto.SavingAccountRequest;
 import org.astrabank.models.Account;
 import org.astrabank.models.Bank;
+import org.astrabank.models.MortgageAccount;
 import org.astrabank.models.User;
 import org.astrabank.utils.AccountNumberGenerator;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -249,4 +252,37 @@ public class AccountService {
         return account;
     }
 
+    public MortgageAccount createMortgageAccount(MortgageAccountRequest request) throws ExecutionException, InterruptedException {
+        Firestore dbFirestore = FirestoreClient.getFirestore();
+        String newAccountNumber = generateUniqueAccountNumber(dbFirestore);
+
+        MortgageAccount newAccount = new MortgageAccount();
+
+        // --- Set thuộc tính chung của Account ---
+        newAccount.setUserId(request.getUserId());
+        newAccount.setAccountNumber(newAccountNumber);
+        newAccount.setBalance(200000000);
+        newAccount.setAccountType(AccountType.MORTGAGE);
+        newAccount.setAccountStatus(true);
+        newAccount.setCreatedAt(new Date());
+        newAccount.setInterestRate(0.038);
+        newAccount.setIsLoan(false);
+        newAccount.setPresentLoanId("");
+
+        dbFirestore.collection("accounts").document(newAccountNumber).set(newAccount).get();
+
+        return newAccount;
+    }
+
+    public MortgageAccount findMortgageAccount(String accountNumber) throws ExecutionException, InterruptedException {
+        Firestore dbFirestore = FirestoreClient.getFirestore();
+        DocumentReference docRef = dbFirestore.collection("accounts").document(accountNumber);
+        DocumentSnapshot document = docRef.get().get();
+
+        if (document.exists()) {
+            return document.toObject(MortgageAccount.class);
+        } else {
+            return null;
+        }
+    }
 }

@@ -10,6 +10,7 @@ import com.google.firebase.cloud.FirestoreClient;
 import com.google.firebase.iid.FirebaseInstanceId;
 import org.astrabank.dto.ChangePINRequest;
 import org.astrabank.dto.UpdateUserRequest;
+import org.astrabank.models.Account;
 import org.astrabank.models.User;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -113,8 +114,8 @@ public class UserService {
         }
     }
 
-    public User login(String email, String password) throws ExecutionException, InterruptedException {
-        if (password == null || password.isEmpty()) {
+    public User login(String email, String pin) throws ExecutionException, InterruptedException {
+        if (pin == null || pin.isEmpty()) {
             return null;
         }
 
@@ -130,13 +131,29 @@ public class UserService {
         }
 
         User user = querySnapshot.getDocuments().get(0).toObject(User.class);
-        boolean isMatch = passwordEncoder.matches(password, user.getPassword());
+        boolean isMatch = passwordEncoder.matches(pin, user.getTransactionPIN());
         if (isMatch) {
             user.setPassword(null);
             user.setTransactionPIN(null);
             return user;
         }
         else {
+            return null;
+        }
+    }
+
+    public User findAccountByEmail(String email) throws ExecutionException, InterruptedException {
+        Firestore dbFirestore = FirestoreClient.getFirestore();
+
+        Query query = dbFirestore.collection("users")
+                .whereEqualTo("email", email)
+                .limit(1); // Chỉ lấy 1 kết quả đầu tiên
+
+        QuerySnapshot querySnapshot = query.get().get();
+
+        if (!querySnapshot.isEmpty()) {
+            return querySnapshot.getDocuments().get(0).toObject(User.class);
+        } else {
             return null;
         }
     }

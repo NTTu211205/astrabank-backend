@@ -13,7 +13,11 @@ public class Loan {
     private String loanId;
     private String accountNumber;
     private int term;
+    private long originalPrincipal;
     private double interestRate;
     private boolean isComplete;
     private Date createdAt;
+    private Date disbursementDate;
+    private String status;
+    private String address;
 }

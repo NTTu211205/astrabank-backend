@@ -2,10 +2,9 @@ package org.astrabank.dto;
 
 import lombok.Data;
 
-import java.util.Date;
-
 @Data
-public class UpdateUserRequest {
+public class AdminCustomerRequest {
+    private String userID;
     private String fullName;
     private String dateOfBirth;
     private String nationalID;
@@ -15,5 +14,8 @@ public class UpdateUserRequest {
     private String occupation;
     private String companyName;
     private Double averageSalary;
+    private String transactionPIN;
+    private String createdBy;
     private String updatedBy;
+    private long deposit;
 }

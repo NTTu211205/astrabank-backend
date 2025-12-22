@@ -4,6 +4,7 @@ import com.google.api.core.ApiFuture;
 import com.google.cloud.firestore.*;
 import com.google.firebase.cloud.FirestoreClient;
 import org.astrabank.constant.AccountType;
+import org.astrabank.constant.TransactionType;
 import org.astrabank.dto.AccountRequest;
 import org.astrabank.dto.AccountResponse;
 import org.astrabank.dto.MortgageAccountRequest;
@@ -43,6 +44,28 @@ public class AccountService {
         account.setAccountStatus(true);
         account.setAccountType(accountRequest.getAccountType());
         account.setBalance(0);
+        account.setCreatedAt(new Date());
+        account.setUserId(accountRequest.getUserId());
+
+        if (accountRequest.getAccountType().toString().equals("SAVING")) {
+            account.setInterestRate(0.045);
+        }
+
+        ApiFuture<WriteResult> future = dbFirestore.collection("accounts").document(accountNumber).set(account);
+
+        return account;
+    }
+
+    public Account createAccount(AccountRequest accountRequest, long balance) throws ExecutionException, InterruptedException {
+        Firestore dbFirestore = FirestoreClient.getFirestore();
+
+        String accountNumber = generateUniqueAccountNumber(dbFirestore);
+
+        Account account = new Account();
+        account.setAccountNumber(accountNumber);
+        account.setAccountStatus(true);
+        account.setAccountType(accountRequest.getAccountType());
+        account.setBalance(balance);
         account.setCreatedAt(new Date());
         account.setUserId(accountRequest.getUserId());
 
@@ -195,7 +218,9 @@ public class AccountService {
         if (!querySnapshot.isEmpty()) {
             for (QueryDocumentSnapshot document : querySnapshot) {
                 Account account = document.toObject(Account.class);
-                accounts.add(account);
+                if (!AccountType.MORTGAGE.equals(account.getAccountType())) {
+                    accounts.add(account);
+                }
             }
             return accounts;
         }
@@ -261,11 +286,11 @@ public class AccountService {
         // --- Set thuộc tính chung của Account ---
         newAccount.setUserId(request.getUserId());
         newAccount.setAccountNumber(newAccountNumber);
-        newAccount.setBalance(200000000);
+        newAccount.setBalance(request.getBalance());
         newAccount.setAccountType(AccountType.MORTGAGE);
         newAccount.setAccountStatus(true);
         newAccount.setCreatedAt(new Date());
-        newAccount.setInterestRate(0.038);
+        newAccount.setInterestRate(request.getInterestRate());
         newAccount.setIsLoan(false);
         newAccount.setPresentLoanId("");
 
@@ -284,5 +309,41 @@ public class AccountService {
         } else {
             return null;
         }
+    }
+
+    public boolean updateAccountStatus(String accountNumber, Boolean newStatus) throws ExecutionException, InterruptedException {
+        Firestore db = FirestoreClient.getFirestore();
+
+        // --- BƯỚC 1: KIỂM TRA ĐIỀU KIỆN NGHIỆP VỤ ---
+        // Chỉ kiểm tra khi hành động là "Khóa tài khoản" (newStatus = false)
+        if (Boolean.FALSE.equals(newStatus)) {
+
+            Query incompleteLoanQuery = db.collection("loans")
+                    .whereEqualTo("accountNumber", accountNumber)
+                    .whereEqualTo("complete", false)
+                    .limit(1);
+
+            QuerySnapshot loanSnapshot = incompleteLoanQuery.get().get();
+
+            if (!loanSnapshot.isEmpty()) {
+                throw new IllegalArgumentException("Account has incomplete loan");
+            }
+        }
+
+        Query accountQuery = db.collection("accounts")
+                .whereEqualTo("accountNumber", accountNumber)
+                .limit(1);
+
+        QuerySnapshot accountSnapshot = accountQuery.get().get();
+
+        if (accountSnapshot.isEmpty()) {
+            throw new IllegalArgumentException("Account Number " + accountNumber + " not found");
+        }
+
+        DocumentReference docRef = accountSnapshot.getDocuments().get(0).getReference();
+
+        docRef.update("accountStatus", newStatus).get();
+
+        return true;
     }
 }

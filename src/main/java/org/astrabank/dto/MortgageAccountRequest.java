@@ -11,5 +11,7 @@ import java.util.Date;
 @AllArgsConstructor
 @NoArgsConstructor
 public class MortgageAccountRequest {
-    private String userId;           // ID người sở hữu tài khoản
+    private String userId;
+    private long balance;
+    private double interestRate;
 }

@@ -225,4 +225,26 @@ public class TransactionController {
                             .build());
         }
     }
+
+    @GetMapping
+    public ResponseEntity<ApiResponse<List<Transaction>>> getAllTransactions() {
+        try {
+            // Gọi Service
+            List<Transaction> transactions = transactionService.getAllTransactionsDesc();
+
+            return ResponseEntity.ok(ApiResponse.<List<Transaction>>builder()
+                    .code(STATUS_CODE_OK)
+                    .message("Get list transaction success")
+                    .result(transactions)
+                    .build());
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.<List<Transaction>>builder()
+                            .code(STATUS_CODE_FAILED)
+                            .message("Eror: " + e.getMessage())
+                            .result(null)
+                            .build());
+        }
+    }
 }

@@ -376,4 +376,112 @@ public class AccountController {
                             .build());
         }
     }
+
+    @GetMapping("/find-receipt-by-id/{receiptId}")
+    public ResponseEntity<ApiResponse<LoanReceipt>> findReceiptById(@PathVariable String receiptId) {
+        try {
+            LoanReceipt receipt = mortgageAccountService.findReceiptById(receiptId);
+
+            if (receipt == null) {
+                return ResponseEntity.ok(ApiResponse.<LoanReceipt>builder()
+                        .code(STATUS_CODE_OK)
+                        .message("Receipt not found")
+                        .result(null)
+                        .build());
+            }
+            else {
+                return ResponseEntity.ok(ApiResponse.<LoanReceipt>builder()
+                        .code(STATUS_CODE_OK)
+                        .message("Find receipt successfully ")
+                        .result(receipt)
+                        .build());
+            }
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.<LoanReceipt>builder()
+                            .code(STATUS_CODE_FAILED)
+                            .message(e.getMessage())
+                            .result(null)
+                            .build());
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.<LoanReceipt>builder()
+                            .code(STATUS_CODE_FAILED)
+                            .message("Lỗi hệ thống: " + e.getMessage())
+                            .result(null)
+                            .build());
+        }
+    }
+
+    @GetMapping("/mortgages")
+    public ResponseEntity<ApiResponse<List<MortgageAccount>>> getAllMortgageAccounts() {
+        try {
+            List<MortgageAccount> accounts = mortgageAccountService.getMortgageAccounts();
+
+             if (accounts == null) {
+                 return ResponseEntity.ok(ApiResponse.<List<MortgageAccount>>builder()
+                         .code(STATUS_CODE_OK)
+                         .message("not found")
+                         .result(null)
+                         .build());
+             }
+             else {
+                 return ResponseEntity.ok(ApiResponse.<List<MortgageAccount>>builder()
+                         .code(STATUS_CODE_OK)
+                         .message("Find all mortgage accounts")
+                         .result(accounts)
+                         .build());
+             }
+
+        } catch (Exception e) {
+            return ResponseEntity.status(STATUS_CODE_FAILED)
+                    .body(ApiResponse.<List<MortgageAccount>>builder()
+                            .code(STATUS_CODE_FAILED)
+                            .message("Lỗi hệ thống: " + e.getMessage())
+                            .result(null)
+                            .build());
+        }
+    }
+
+    @PutMapping("/update-status/{accountNumber}/{status}")
+    public ResponseEntity<ApiResponse<Boolean>> updateStatus(
+            @PathVariable String accountNumber,
+            @PathVariable Boolean status) {
+        try {
+
+            boolean isUpdated = accountService.updateAccountStatus(accountNumber, status);
+
+            if  (isUpdated) {
+                return ResponseEntity.ok(ApiResponse.<Boolean>builder()
+                        .code(STATUS_CODE_OK)
+                        .message("Update successfully")
+                        .result(isUpdated)
+                        .build());
+            }
+            else {
+                return ResponseEntity.ok(ApiResponse.<Boolean>builder()
+                        .code(STATUS_CODE_OK)
+                        .message("update failed")
+                        .result(isUpdated)
+                        .build());
+            }
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.<Boolean>builder()
+                            .code(STATUS_CODE_FAILED)
+                            .message(e.getMessage())
+                            .result(false)
+                            .build());
+
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError()
+                    .body(ApiResponse.<Boolean>builder()
+                            .code(STATUS_CODE_FAILED)
+                            .message("Lỗi hệ thống: " + e.getMessage())
+                            .result(false)
+                            .build());
+        }
+    }
 }

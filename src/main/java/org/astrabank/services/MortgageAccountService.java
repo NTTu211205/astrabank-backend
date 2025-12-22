@@ -7,6 +7,7 @@ import org.astrabank.dto.DisbursementRequest;
 import org.astrabank.dto.LoanRequest;
 import org.astrabank.dto.ReceiptPaymentRequest;
 import org.astrabank.models.Loan;
+import org.astrabank.models.MortgageAccount;
 import org.astrabank.models.Transaction;
 import org.astrabank.models.LoanReceipt;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -189,7 +190,7 @@ public class MortgageAccountService {
                     dbFirestore.collection("accounts")
                             .whereEqualTo("userId", accSnap.getString("userId"))
                             .whereEqualTo("accountType", "CHECKING")
-                            .whereEqualTo("accountStatus", true) // Chỉ giải ngân vào TK đang hoạt động
+                            .whereEqualTo("accountStatus", true)
                             .limit(1)
             ).get();
 
@@ -322,5 +323,44 @@ public class MortgageAccountService {
         QuerySnapshot querySnapshot = query.get().get();
 
         return querySnapshot.toObjects(LoanReceipt.class);
+    }
+
+    public LoanReceipt findReceiptById(String receiptId) throws ExecutionException, InterruptedException {
+        Firestore dbFirestore = FirestoreClient.getFirestore();
+
+        DocumentSnapshot document = dbFirestore.collection("receipts")
+                .document(receiptId)
+                .get()
+                .get();
+
+        if (document.exists()) {
+            return document.toObject(LoanReceipt.class);
+        } else {
+            return null;
+        }
+    }
+
+    public List<MortgageAccount> getMortgageAccounts() throws ExecutionException, InterruptedException {
+        Firestore db = FirestoreClient.getFirestore();
+        List<MortgageAccount> mortgageList = new ArrayList<>();
+
+        // Query tìm tất cả account có type là "mortgage"
+        Query query = db.collection("accounts")
+                .whereEqualTo("accountType", "MORTGAGE");
+
+        // Thực thi query
+        QuerySnapshot querySnapshot = query.get().get();
+
+        // Convert documents sang List<Account>
+        if (!querySnapshot.isEmpty()) {
+            for (QueryDocumentSnapshot document : querySnapshot) {
+                MortgageAccount account = document.toObject(MortgageAccount.class);
+                // Nếu cần gán lại ID từ document ID (tùy logic của bạn)
+                // account.setAccountId(document.getId());
+                mortgageList.add(account);
+            }
+        }
+
+        return mortgageList;
     }
 }

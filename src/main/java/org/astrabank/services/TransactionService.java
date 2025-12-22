@@ -788,4 +788,15 @@ public class TransactionService {
 
         return transaction;
     }
+
+    public List<Transaction> getAllTransactionsDesc() throws ExecutionException, InterruptedException {
+        Firestore dbFirestore = FirestoreClient.getFirestore();
+
+        Query query = dbFirestore.collection("transactions")
+                .orderBy("createdAt", Query.Direction.DESCENDING);
+
+        QuerySnapshot querySnapshot = query.get().get();
+
+        return querySnapshot.toObjects(Transaction.class);
+    }
 }

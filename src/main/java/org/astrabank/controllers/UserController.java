@@ -1,6 +1,7 @@
 package org.astrabank.controllers;
 
 import org.astrabank.dto.*;
+import org.astrabank.models.Staff;
 import org.astrabank.models.User;
 import org.astrabank.services.UserService;
 import org.springframework.http.HttpStatus;
@@ -22,11 +23,82 @@ public class UserController {
         this.userService = userService;
     }
 
-    @PostMapping("/create")
-    public ResponseEntity<ApiResponse<User>> createUser(@RequestBody User user) {
+    @PostMapping("/create-staff")
+    public ResponseEntity<ApiResponse<Staff>> createStaff(@RequestBody StaffRequest user) {
         try {
             // Gọi Service
-            User createdUser = userService.createUser(user);
+            Staff createdUser = userService.createStaff(user);
+
+            // Tạo cấu trúc phản hồi chuẩn
+            ApiResponse<Staff> response = ApiResponse.<Staff>builder()
+                    .code(STATUS_CODE_OK) // Quy ước: 1000 là thành công
+                    .message("Registered successfully")
+                    .result(createdUser)
+                    .build();
+
+            // Trả về HTTP 201 (Created) kèm body
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+
+        }
+        catch (IllegalArgumentException e) {
+            ApiResponse<Staff> errorResponse = ApiResponse.<Staff>builder()
+                    .code(STATUS_CODE_FAILED)
+                    .message(e.getMessage())
+                    .result(null)
+                    .build();
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+        }
+        catch (Exception e) {
+            ApiResponse<Staff> errorResponse = ApiResponse.<Staff>builder()
+                    .code(STATUS_CODE_FAILED)
+                    .message(e.getMessage())
+                    .result(null)
+                    .build();
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+        }
+    }
+
+    @PostMapping("/create")
+    public ResponseEntity<ApiResponse<User>> createCustomer(@RequestBody CustomerRequest user) {
+        try {
+            // Gọi Service
+            System.out.println("user" + user.toString());
+            User createdUser = userService.createCustomer(user);
+
+            // Tạo cấu trúc phản hồi chuẩn
+            ApiResponse<User> response = ApiResponse.<User>builder()
+                    .code(STATUS_CODE_OK) // Quy ước: 1000 là thành công
+                    .message("Registered successfully")
+                    .result(createdUser)
+                    .build();
+
+            // Trả về HTTP 201 (Created) kèm body
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+
+        }
+        catch (IllegalArgumentException e) {
+            ApiResponse<User> errorResponse = ApiResponse.<User>builder()
+                    .code(STATUS_CODE_FAILED)
+                    .message(e.getMessage())
+                    .result(null)
+                    .build();
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+        }
+        catch (Exception e) {
+            ApiResponse<User> errorResponse = ApiResponse.<User>builder()
+                    .code(STATUS_CODE_FAILED)
+                    .message(e.getMessage())
+                    .result(null)
+                    .build();
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+        }
+    }
+
+    @PostMapping("/admin-create")
+    public ResponseEntity<ApiResponse<User>> createCustomerForAdmin(@RequestBody AdminCustomerRequest user) {
+        try {
+            // Gọi Service
+            User createdUser = userService.createUserForAdmin(user);
 
             // Tạo cấu trúc phản hồi chuẩn
             ApiResponse<User> response = ApiResponse.<User>builder()
@@ -60,10 +132,11 @@ public class UserController {
     @GetMapping("/check-existence")
     public ResponseEntity<ApiResponse<Boolean>> checkExistence(
             @RequestParam String email,
-            @RequestParam String phoneNumber) {
+            @RequestParam String phoneNumber,
+            @RequestParam String nationalID) {
         try {
             // Gọi Service kiểm tra
-            boolean exists = userService.checkUserExists(email, phoneNumber);
+            boolean exists = userService.checkUserExists(email, phoneNumber, nationalID);
 
             ApiResponse<Boolean> response = ApiResponse.<Boolean>builder()
                     .code(STATUS_CODE_OK)
@@ -170,7 +243,6 @@ public class UserController {
         try {
             User updatedUser = userService.updateUserProfile(userId, request);
 
-            updatedUser.setPassword(null);
             updatedUser.setTransactionPIN(null);
 
             return ResponseEntity.ok(ApiResponse.<User>builder()
@@ -251,6 +323,98 @@ public class UserController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponse.<User>builder()
+                            .code(STATUS_CODE_FAILED)
+                            .message("Lỗi hệ thống: " + e.getMessage())
+                            .result(null)
+                            .build());
+        }
+    }
+
+    @GetMapping("/find-by-id/{userId}")
+    public ResponseEntity<ApiResponse<User>> findUserByUserId(@PathVariable("userId") String userId) {
+        try {
+            User user = userService.findUserById(userId);
+
+            if (user == null) {
+                return ResponseEntity.ok(ApiResponse.<User>builder()
+                        .code(STATUS_CODE_OK)
+                        .message("User not found with ID: " + userId)
+                        .result(null)
+                        .build());
+            } else {
+                return ResponseEntity.ok(ApiResponse.<User>builder()
+                        .code(STATUS_CODE_OK)
+                        .message("Find user successfully")
+                        .result(user)
+                        .build());
+            }
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.<User>builder()
+                            .code(STATUS_CODE_FAILED)
+                            .message(e.getMessage())
+                            .result(null)
+                            .build());
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.<User>builder()
+                            .code(STATUS_CODE_FAILED)
+                            .message("Lỗi hệ thống: " + e.getMessage())
+                            .result(null)
+                            .build());
+        }
+    }
+
+    @GetMapping("/customers")
+    public ResponseEntity<ApiResponse<List<User>>> getAllCustomers() {
+        try {
+            // 1. Gọi Service
+            List<User> customers = userService.getAllCustomers();
+
+            // 2. Trả về kết quả
+            return ResponseEntity.ok(ApiResponse.<List<User>>builder()
+                    .code(STATUS_CODE_OK)
+                    .message("Find customers successfully")
+                    .result(customers)
+                    .build());
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.<List<User>>builder()
+                            .code(STATUS_CODE_FAILED)
+                            .message("Error" + e.getMessage())
+                            .result(null)
+                            .build());
+        }
+    }
+
+    @PutMapping("/update-status/{userId}/{status}")
+    public ResponseEntity<ApiResponse<Boolean>> deactivateUser(@PathVariable String userId, @PathVariable Boolean status) {
+        userService.deactivateUserSystem(userId, status);
+
+        return ResponseEntity.ok(ApiResponse.<Boolean>builder()
+                .code(STATUS_CODE_OK)
+                .message("Update success")
+                .result(true)
+                .build());
+    }
+
+    @GetMapping("/customers/no-mortgage")
+    public ResponseEntity<ApiResponse<List<User>>> getCustomersNoMortgage() {
+        try {
+            List<User> users = userService.getCustomersWithoutMortgage();
+
+            return ResponseEntity.ok(ApiResponse.<List<User>>builder()
+                    .code(STATUS_CODE_OK)
+                    .message("Lấy danh sách khách hàng không có khoản vay thế chấp thành công")
+                    .result(users)
+                    .build());
+
+        } catch (Exception e) {
+            return ResponseEntity.status(500)
+                    .body(ApiResponse.<List<User>>builder()
                             .code(STATUS_CODE_FAILED)
                             .message("Lỗi hệ thống: " + e.getMessage())
                             .result(null)
